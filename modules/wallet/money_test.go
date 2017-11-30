@@ -1,10 +1,13 @@
 package wallet
 
 import (
+	"log"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/NebulousLabs/Sia/types"
+	"github.com/NebulousLabs/fastrand"
 )
 
 // TestSendSiacoins probes the SendSiacoins method of the wallet.
@@ -67,6 +70,132 @@ func TestSendSiacoins(t *testing.T) {
 	}
 	if !unconfirmedIn3.Equals(types.ZeroCurrency) {
 		t.Error("unconfirmed balance should be 0")
+	}
+}
+
+// TestSendSiacoinsMulti checks the functionality of SendSiacoinsMulti
+func TestTransactionSetSlowdown(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	wt, err := createWalletTester("wt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt.closeWt()
+	wt2, err := createWalletTester("wt2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt2.closeWt()
+	wt3, err := createWalletTester("wt3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer wt3.closeWt()
+
+	// Connect nodes
+	if err := wt.gateway.Connect(wt2.gateway.Address()); err != nil {
+		t.Fatal(err)
+	}
+	if err := wt.gateway.Connect(wt3.gateway.Address()); err != nil {
+		t.Fatal(err)
+	}
+	if err := wt2.gateway.Connect(wt3.gateway.Address()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second * 10)
+
+	// Mine some blocks to synch the nodes and fund them
+	for i := 0; i < 3; i++ {
+		if _, err := wt.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		if _, err := wt2.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+		if _, err := wt3.miner.AddBlock(); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(time.Second)
+	}
+
+	// The first wt continues mining blocks every 30 seconds
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				break
+			case <-time.After(30 * time.Second):
+			}
+			log.Print("Mine Mine Mine")
+			if _, err := wt.miner.AddBlock(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}()
+
+	// Generate numOutputs outputs
+	numOutputs := 500
+
+	// wt2 and wt3 keep sending coins to each other while wt mines the transactions
+	j := 0
+	for n := time.Now(); time.Since(n).Hours() < 24; {
+		var scos2 []types.SiacoinOutput
+		var scos3 []types.SiacoinOutput
+
+		r2, err := wt2.wallet.NextAddresses(uint64(numOutputs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		r3, err := wt3.wallet.NextAddresses(uint64(numOutputs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < numOutputs; i++ {
+			scos2 = append(scos2, types.SiacoinOutput{
+				Value:      types.SiacoinPrecision.Mul64(uint64(fastrand.Intn(20)) + 1),
+				UnlockHash: r2[i].UnlockHash(),
+			})
+			scos3 = append(scos3, types.SiacoinOutput{
+				Value:      types.SiacoinPrecision.Mul64(uint64(fastrand.Intn(20)) + 1),
+				UnlockHash: r3[i].UnlockHash(),
+			})
+		}
+
+		// Send money to outputs
+		log.Printf("Iter %v", j)
+		j++
+
+		// Send coins
+		iterative := false
+		start := time.Now()
+		if iterative {
+			for k, _ := range scos2 {
+				_, err := wt2.wallet.SendSiacoins(scos3[k].Value, scos3[k].UnlockHash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = wt3.wallet.SendSiacoins(scos2[k].Value, scos2[k].UnlockHash)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+		} else {
+			_, err := wt2.wallet.SendSiacoinsMulti(scos3)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = wt3.wallet.SendSiacoinsMulti(scos2)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		log.Print("    Total: ", time.Since(start).Seconds())
 	}
 }
 

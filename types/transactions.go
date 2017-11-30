@@ -189,7 +189,7 @@ func (t Transaction) SiacoinOutputID(i uint64) SiacoinOutputID {
 
 	// Sanity check - verify that the optimized code is always returning the
 	// same ids as the unoptimized code.
-	if build.DEBUG {
+	if false {
 		verificationID := SiacoinOutputID(crypto.HashAll(
 			SpecifierSiacoinOutput,
 			t.SiacoinInputs,

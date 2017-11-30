@@ -1,6 +1,9 @@
 package wallet
 
 import (
+	"log"
+	"time"
+
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
@@ -153,10 +156,12 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) ([]types.Trans
 	for _, sco := range outputs {
 		totalCost = totalCost.Add(sco.Value)
 	}
+	s := time.Now()
 	err := txnBuilder.FundSiacoins(totalCost)
 	if err != nil {
 		return nil, build.ExtendErr("unable to fund transaction", err)
 	}
+	log.Printf("    FundSiacoins: %v", time.Since(s).Seconds())
 
 	for _, sco := range outputs {
 		txnBuilder.AddSiacoinOutput(sco)

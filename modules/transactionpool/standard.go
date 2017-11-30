@@ -2,6 +2,7 @@ package transactionpool
 
 import (
 	"errors"
+	"log"
 
 	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
@@ -131,6 +132,7 @@ func isStandardTransactionSet(ts []types.Transaction) (uint64, error) {
 		}
 		totalSize += tSize
 		if totalSize > modules.TransactionSetSizeLimit {
+			log.Print("length ", len(ts))
 			return 0, modules.ErrLargeTransactionSet
 		}
 
