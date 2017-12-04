@@ -96,6 +96,9 @@ type Miner struct {
 	splitSetIDFromTxID map[types.TransactionID]splitSetID
 	unsolvedBlockIndex map[types.TransactionID]int
 
+	// Current sets - HOTFIX CODE.
+	availableSets map[modules.TransactionSetID]*modules.UnconfirmedTransactionSet
+
 	// CPUMiner variables.
 	miningOn bool  // indicates if the miner is supposed to be running
 	mining   bool  // indicates if the miner is actually running
@@ -185,6 +188,8 @@ func New(cs modules.ConsensusSet, tpool modules.TransactionPool, w modules.Walle
 		},
 		splitSetIDFromTxID: make(map[types.TransactionID]splitSetID),
 		unsolvedBlockIndex: make(map[types.TransactionID]int),
+
+		availableSets: make(map[modules.TransactionSetID]*modules.UnconfirmedTransactionSet),
 
 		persistDir: persistDir,
 	}

@@ -3,6 +3,7 @@ package miner
 import (
 	"sort"
 
+	"github.com/NebulousLabs/Sia/encoding"
 	"github.com/NebulousLabs/Sia/modules"
 	"github.com/NebulousLabs/Sia/types"
 )
@@ -307,8 +308,26 @@ func (m *Miner) ReceiveUpdatedUnconfirmedTransactions(diff *modules.TransactionP
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.deleteReverts(diff)
-	m.addNewTxns(diff)
+	// Update the available sets.
+	for _, txnSet := range diff.AppliedTransactions {
+		m.availableSets[txnSet.ID] = txnSet
+	}
+	for _, txnSetID := range diff.RevertedTransactions {
+		delete(m.availableSets, txnSetID)
+	}
+
+	// Add transactions to the block until the size limit is reached.
+	m.persist.UnsolvedBlock.Transactions = m.persist.UnsolvedBlock.Transactions[:0]
+	remainingSize := int(types.BlockSizeLimit - 5e3)
+	for _, txnSet := range m.availableSets {
+		for _, txn := range txnSet.Transactions {
+			remainingSize -= len(encoding.Marshal(txn))
+			if remainingSize < 0 {
+				break
+			}
+			m.persist.UnsolvedBlock.Transactions = append(m.persist.UnsolvedBlock.Transactions, txn)
+		}
+	}
 }
 
 // removeSplitSetFromUnsolvedBlock removes a split set from the miner's unsolved
