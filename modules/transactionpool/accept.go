@@ -324,22 +324,29 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 // TODO: Break into component sets when the set gets accepted.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// assert on consensus set to get special method
+	fmt.Println("entering accept transaction set")
 	cs, ok := tp.consensusSet.(interface {
 		LockedTryTransactionSet(fn func(func(txns []types.Transaction) (modules.ConsensusChange, error)) error) error
 	})
 	if !ok {
+		fmt.Println("error - consensus set doesn't support required function")
 		return errors.New("consensus set does not support LockedTryTransactionSet method")
 	}
 
+	fmt.Println("trying LockedTryTransactionSet")
 	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
+		fmt.Println("locking tp")
 		tp.mu.Lock()
 		defer tp.mu.Unlock()
+		fmt.Println("acceptTransactionSet - unexported callout")
 		err := tp.acceptTransactionSet(ts, txnFn)
 		if err != nil {
 			return err
 		}
+		fmt.Println("broadcasting")
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
+		fmt.Println("updating subscribers")
 		tp.updateSubscribersTransactions()
 		return nil
 	})

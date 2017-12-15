@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -375,6 +376,9 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	var txns []types.Transaction
 	if req.FormValue("outputs") != "" {
+		fmt.Println("starting api call to perform SendSiacoinsMulti")
+		defer fmt.Println("finishing api call to perform SendSiacoinsMulti")
+
 		// multiple amounts + destinations
 		if req.FormValue("amount") != "" || req.FormValue("destination") != "" {
 			WriteError(w, Error{"cannot supply both 'outputs' and single amount+destination pair"}, http.StatusInternalServerError)
@@ -387,11 +391,15 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			WriteError(w, Error{"could not decode outputs: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		fmt.Println("all has been parsed, performing the send")
 		txns, err = api.wallet.SendSiacoinsMulti(outputs)
+		fmt.Println("the SendSiacoinsMulti method has returned")
 		if err != nil {
+			fmt.Println("Error detected:", err)
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		fmt.Println("seems that there was no error")
 	} else {
 		// single amount + destination
 		amount, ok := scanAmount(req.FormValue("amount"))
@@ -417,9 +425,11 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())
 	}
+	fmt.Println("writing the header and posting")
 	WriteJSON(w, WalletSiacoinsPOST{
 		TransactionIDs: txids,
 	})
+	fmt.Println("should be cleaning up now")
 }
 
 // walletSiafundsHandler handles API calls to /wallet/siafunds.
