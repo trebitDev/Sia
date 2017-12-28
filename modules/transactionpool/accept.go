@@ -249,6 +249,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	}
 
 	// Check the composition of the transaction set.
+	fmt.Println("checking transaction set composition")
 	setSize, err := tp.checkTransactionSetComposition(ts)
 	if err != nil {
 		return err
@@ -256,6 +257,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 
 	// Check that the transaction set has enough fees to justify adding it to
 	// the transaction list.
+	fmt.Println("required fees estimation")
 	requiredFees := tp.requiredFeesToExtendTpool().Mul64(setSize)
 	if err != nil {
 		return err
@@ -275,6 +277,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	// Check for conflicts with other transactions, which would indicate a
 	// double-spend. Legal children of a transaction set will also trigger the
 	// conflict-detector.
+	fmt.Println("known object matching")
 	oids := relatedObjectIDs(ts)
 	var conflicts []TransactionSetID
 	for _, oid := range oids {
@@ -284,6 +287,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 		}
 	}
 	if len(conflicts) > 0 {
+		fmt.Println("handling conflicts")
 		return tp.handleConflicts(ts, conflicts, txnFn)
 	}
 	cc, err := txnFn(ts)
@@ -292,6 +296,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 	}
 
 	// Add the transaction set to the pool.
+	fmt.Println("updating the transaction sets and known object sets")
 	setID := TransactionSetID(crypto.HashObject(ts))
 	tp.transactionSets[setID] = ts
 	for _, oid := range oids {
@@ -305,6 +310,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 			tp.transactionHeights[txn.ID()] = tp.blockHeight
 		}
 	}
+	fmt.Println("pool addition completed")
 
 	// debug logging
 	if build.DEBUG {
@@ -324,6 +330,7 @@ func (tp *TransactionPool) acceptTransactionSet(ts []types.Transaction, txnFn fu
 // TODO: Break into component sets when the set gets accepted.
 func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 	// assert on consensus set to get special method
+	fmt.Println("AcceptTranasctionSet entry")
 	cs, ok := tp.consensusSet.(interface {
 		LockedTryTransactionSet(fn func(func(txns []types.Transaction) (modules.ConsensusChange, error)) error) error
 	})
@@ -331,16 +338,22 @@ func (tp *TransactionPool) AcceptTransactionSet(ts []types.Transaction) error {
 		return errors.New("consensus set does not support LockedTryTransactionSet method")
 	}
 
+	fmt.Println("LockedTryTransactionSet")
 	return cs.LockedTryTransactionSet(func(txnFn func(txns []types.Transaction) (modules.ConsensusChange, error)) error {
 		tp.mu.Lock()
 		defer tp.mu.Unlock()
+		fmt.Println("acceptTransactionSet mini-entry")
 		err := tp.acceptTransactionSet(ts, txnFn)
+		fmt.Println("acceptTransactionSet complete")
 		if err != nil {
 			return err
 		}
+		fmt.Println("Broadcasting the transaction set")
 		go tp.gateway.Broadcast("RelayTransactionSet", ts, tp.gateway.Peers())
 		// Notify subscribers of an accepted transaction set
+		fmt.Println("updating the subscribers of the transaction pool")
 		tp.updateSubscribersTransactions()
+		fmt.Println("subscribers updated")
 		return nil
 	})
 }

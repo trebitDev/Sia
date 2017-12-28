@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NebulousLabs/Sia/crypto"
 	"github.com/NebulousLabs/Sia/modules"
@@ -373,9 +375,12 @@ func (api *API) walletSeedsHandler(w http.ResponseWriter, req *http.Request, _ h
 
 // walletSiacoinsHandler handles API calls to /wallet/siacoins.
 func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	start := time.Now()
+	fmt.Println("/wallet/siacoins called - creating siacoin transaction")
 	var txns []types.Transaction
 	if req.FormValue("outputs") != "" {
 		// multiple amounts + destinations
+		fmt.Println("/wallet/siacoins called - parsing the multiple amounts and destinations")
 		if req.FormValue("amount") != "" || req.FormValue("destination") != "" {
 			WriteError(w, Error{"cannot supply both 'outputs' and single amount+destination pair"}, http.StatusInternalServerError)
 			return
@@ -387,12 +392,16 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			WriteError(w, Error{"could not decode outputs: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		fmt.Println("/wallet/siacoins - creating send multi call")
 		txns, err = api.wallet.SendSiacoinsMulti(outputs)
+		fmt.Println("/wallet/siacoins - SendSiacoinsMulti has returned")
 		if err != nil {
+			fmt.Println("/wallet/siacoins - SendSiacoinsMulti has returned an error:", err)
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 	} else {
+		fmt.Println("/wallet/siacoins single amount + destination requested")
 		// single amount + destination
 		amount, ok := scanAmount(req.FormValue("amount"))
 		if !ok {
@@ -405,21 +414,27 @@ func (api *API) walletSiacoinsHandler(w http.ResponseWriter, req *http.Request, 
 			return
 		}
 
+		fmt.Println("/wallet/siacoins parsing complete, calling SendSiacoins")
 		txns, err = api.wallet.SendSiacoins(amount, dest)
+		fmt.Println("/wallet/siacoins call to SendSiacoins complete")
 		if err != nil {
+			fmt.Println("/wallet/siacoins - SendSiacoins returned an error:", err)
 			WriteError(w, Error{"error when calling /wallet/siacoins: " + err.Error()}, http.StatusInternalServerError)
 			return
 		}
 
 	}
 
+	fmt.Println("/wallet/siacoins send complete, processing result")
 	var txids []types.TransactionID
 	for _, txn := range txns {
 		txids = append(txids, txn.ID())
 	}
+	fmt.Println("/wallet/siacoins call nearly complete, writing response")
 	WriteJSON(w, WalletSiacoinsPOST{
 		TransactionIDs: txids,
 	})
+	fmt.Println("/wallet/siacoins call completed:", time.Since(start))
 }
 
 // walletSiafundsHandler handles API calls to /wallet/siafunds.

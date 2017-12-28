@@ -2,6 +2,7 @@ package wallet
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/NebulousLabs/Sia/build"
 	"github.com/NebulousLabs/Sia/modules"
@@ -85,6 +86,7 @@ func (w *Wallet) UnconfirmedBalance() (outgoingSiacoins types.Currency, incoming
 // SendSiacoins creates a transaction sending 'amount' to 'dest'. The transaction
 // is submitted to the transaction pool and is also returned.
 func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txns []types.Transaction, err error) {
+	fmt.Println("SendSiacoins entry")
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -94,6 +96,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 		return nil, modules.ErrLockedWallet
 	}
 
+	fmt.Println("SendSiacoins FeeEstimation")
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(750) // Estimated transaction size in bytes
 	output := types.SiacoinOutput{
@@ -107,6 +110,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 			txnBuilder.Drop()
 		}
 	}()
+	fmt.Println("SendSiacoins FundSiacoins")
 	err = txnBuilder.FundSiacoins(amount.Add(tpoolFee))
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to fund transaction:", err)
@@ -122,7 +126,9 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 	if w.deps.Disrupt("SendSiacoinsInterrupted") {
 		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
+	fmt.Println("SendSiacoins AcceptTransactionSet")
 	err = w.tpool.AcceptTransactionSet(txnSet)
+	fmt.Println("SendSiacoins AcceptTransactionSet returned")
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
@@ -131,6 +137,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 	for _, txn := range txnSet {
 		w.log.Println("\t", txn.ID())
 	}
+	fmt.Println("Returning from SendSiacoins")
 	return txnSet, nil
 }
 
@@ -138,6 +145,7 @@ func (w *Wallet) SendSiacoins(amount types.Currency, dest types.UnlockHash) (txn
 // outputs. The transaction is submitted to the transaction pool and is also
 // returned.
 func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.Transaction, err error) {
+	fmt.Println("SendSiacoinsMulti entry")
 	if err := w.tg.Add(); err != nil {
 		return nil, err
 	}
@@ -147,6 +155,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 		return nil, modules.ErrLockedWallet
 	}
 
+	fmt.Println("SendSiacoinsMulti StartTransaction")
 	txnBuilder := w.StartTransaction()
 	defer func() {
 		if err != nil {
@@ -155,6 +164,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 	}()
 
 	// Add estimated transaction fee.
+	fmt.Println("SendSiacoinsMulti FeeEstimation")
 	_, tpoolFee := w.tpool.FeeEstimation()
 	tpoolFee = tpoolFee.Mul64(2)                              // We don't want send-to-many transactions to fail.
 	tpoolFee = tpoolFee.Mul64(1000 + 60*uint64(len(outputs))) // Estimated transaction size in bytes
@@ -168,6 +178,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 	for _, sco := range outputs {
 		totalCost = totalCost.Add(sco.Value)
 	}
+	fmt.Println("SendSiacoinsMulti FundSiacoins")
 	err = txnBuilder.FundSiacoins(totalCost)
 	if err != nil {
 		return nil, build.ExtendErr("unable to fund transaction", err)
@@ -177,6 +188,7 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 		txnBuilder.AddSiacoinOutput(sco)
 	}
 
+	fmt.Println("SendSiacoinsMulti Sign")
 	txnSet, err := txnBuilder.Sign(true)
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - failed to sign transaction:", err)
@@ -185,7 +197,9 @@ func (w *Wallet) SendSiacoinsMulti(outputs []types.SiacoinOutput) (txns []types.
 	if w.deps.Disrupt("SendSiacoinsInterrupted") {
 		return nil, errors.New("failed to accept transaction set (SendSiacoinsInterrupted)")
 	}
+	fmt.Println("SendSiacoinsMulti AcceptTransactionSet")
 	err = w.tpool.AcceptTransactionSet(txnSet)
+	fmt.Println("SendSiacoinsMulti AcceptTransactionSetReturned")
 	if err != nil {
 		w.log.Println("Attempt to send coins has failed - transaction pool rejected transaction:", err)
 		return nil, build.ExtendErr("unable to get transaction accepted", err)
