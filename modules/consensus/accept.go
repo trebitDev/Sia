@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -293,6 +294,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			// Nothing more to do, the first block was invalid.
 			return false, setErr
 		}
+		fmt.Println("setErr != nil, but there are some valid blocks:", len(validBlocks), len(changes))
 
 		// At least some of the blocks were valid. Add the valid blocks before
 		// returning, since we've already done the downloading and header
@@ -302,6 +304,7 @@ func (cs *ConsensusSet) managedAcceptBlocks(blocks []types.Block) (blockchainExt
 			for i := 0; i < len(validBlocks); i++ {
 				_, err := cs.addBlockToTree(tx, validBlocks[i], parents[i])
 				if err == nil {
+					fmt.Println("new change")
 					verifyExtended = true
 				}
 				if err != modules.ErrNonExtendingBlock && err != nil {
