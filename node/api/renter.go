@@ -103,6 +103,10 @@ type (
 		TotalCost types.Currency `json:"totalcost"`
 		// Amount of contract funds that have been spent on uploads.
 		UploadSpending types.Currency `json:"uploadspending"`
+		// Signals if contract is good for uploading data
+		GoodForUpload bool `json:"goodforupload"`
+		// Signals if contract is good for a renewal
+		GoodForRenew bool `json:"goodforrenew"`
 	}
 
 	// RenterContracts contains the renter's contracts.
@@ -239,6 +243,14 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			netAddress = hdbe.NetAddress
 		}
 
+		// Fetch utilities for contract
+		var goodForUpload bool
+		var goodForRenew bool
+		if utility, ok := api.renter.ContractUtility(c.ID); ok {
+			goodForUpload = utility.GoodForUpload
+			goodForRenew = utility.GoodForRenew
+		}
+
 		contracts = append(contracts, RenterContract{
 			DownloadSpending: c.DownloadSpending,
 			EndHeight:        c.EndHeight,
@@ -253,6 +265,8 @@ func (api *API) renterContractsHandler(w http.ResponseWriter, _ *http.Request, _
 			StorageSpending:  c.StorageSpending,
 			TotalCost:        c.TotalCost,
 			UploadSpending:   c.UploadSpending,
+			GoodForUpload:    goodForUpload,
+			GoodForRenew:     goodForRenew,
 		})
 	}
 	WriteJSON(w, RenterContracts{

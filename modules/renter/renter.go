@@ -422,7 +422,10 @@ func (r *Renter) EstimateHostScore(e modules.HostDBEntry) modules.HostScoreBreak
 }
 
 // contractor passthroughs
-func (r *Renter) Contracts() []modules.RenterContract        { return r.hostContractor.Contracts() }
+func (r *Renter) Contracts() []modules.RenterContract { return r.hostContractor.Contracts() }
+func (r *Renter) ContractUtility(id types.FileContractID) (modules.ContractUtility, bool) {
+	return r.hostContractor.ContractUtility(id)
+}
 func (r *Renter) CurrentPeriod() types.BlockHeight           { return r.hostContractor.CurrentPeriod() }
 func (r *Renter) PeriodSpending() modules.ContractorSpending { return r.hostContractor.PeriodSpending() }
 func (r *Renter) Settings() modules.RenterSettings {
